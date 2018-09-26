@@ -35,10 +35,18 @@
       }
       return formatted;
     };
+    
+
+    idlinkformat = function(entities, entity_ids, entity_class, lat, lng){
+      formatted_str = ''
+      for (i = 0; i < entities.length; i++) {
+        formatted_str += '<br><a href="#" class={0}Rel {0}ID={1} lat={2} lng={3}> {4} </a>'.format(entity_class, entity_ids[i], lat, lng, entities[i])
+        }
+      return formatted_str
+    }
 
     function init() {
       console.log("init");
-      
       //var driver = neo4j.v1.driver("bolt://165.227.223.190:7687", neo4j.v1.auth.basic("ppviz", "ppviz"));
       var driver = neo4j.v1.driver("bolt://localhost:7687", neo4j.v1.auth.basic("neo4j", "MYPASSWORD"));
       
@@ -58,23 +66,24 @@
       */
       var session = driver.session();
       session    
-        .run(`MATCH (a:Address)<-[:REGISTERED_ADDRESS]-(e:Entity)<-[:CONNECTED_TO|OFFICER_OF]-(o:Officer),
-              (o)-[:CONNECTED_TO|OFFICER_OF]->(e2:Entity)-[:REGISTERED_ADDRESS]->(a2:Address)  
-              WHERE e<>e2 and a.country_codes="MYS" and a2.country_codes="MYS" and exists(a2.latitude) and exists(a.latitude)
-              WITH a, COLLECT(DISTINCT o)[0..5] AS officers, COLLECT(DISTINCT e)[0..5] AS entities, COLLECT(DISTINCT e2)[0..5] AS connected_entities, 
-              COLLECT(DISTINCT a2)[0..5] AS connected_adds, COLLECT(DISTINCT e.jurisdiction_description)[0..5] AS jurisdictions, 1.0*COUNT(*) AS strength
+        .run(`MATCH (a:Address)<-[:REGISTERED_ADDRESS]-(e:Entity)<-[:CONNECTED_TO|OFFICER_OF]-(o:Officer)
+              WHERE exists(a.latitude) and exists(a.longitude) 
+              WITH a, COLLECT(DISTINCT o)[0..5] AS officers, COLLECT(DISTINCT e)[0..5] AS entities, 
+              COLLECT(DISTINCT e.jurisdiction_description)[0..5] AS jurisdictions, 1.0*COUNT(*) AS strength
               RETURN a.address AS address, a.latitude AS latitude, a.longitude AS longitude, [x IN officers | x.name] as officers, [x in officers | x.node_id] as officer_ids,
-              [x IN connected_entities | x.name] as connected_entities, [x in connected_adds | [x.address, x.latitude, x.longitude]] as linked_coords, [x IN entities | x.name] as entities, jurisdictions, strength`)
+              [x IN entities | x.name] as entities, [x IN entities | x.node_id] as entity_ids,  jurisdictions, strength`)
         .subscribe({
           onNext: function (record) {
             //console.log(record);
-            var marker = new L.Marker(new L.LatLng(record.get('latitude'), record.get('longitude')));
-            marker.bindPopup('<b>Address:</b> ' + record.get('address') + '<br>' + '<b>Officers: </b>' + record.get('officers').toString() + '<br><b>Entities:</b> ' + record.get('entities').toString() 
-            + '<br><b>Connected Entities:</b> ' + record.get('connected_entities').toString() + '<br><b>Connected Adds:</b> ' + record.get('linked_coords').toString() 
-            + '<br><a href="#" class="drawPaths">TestLink</a>' + '<br><a href="#" class="speciallink2" id="sl2" officerID={0} lat={1} lng={2}>TestLink2</a>'.format(record.get('officer_ids'), record.get('latitude'), record.get('longitude')) 
-            + '<br><b>Offshore Countries: </b> ' + record.get('jurisdictions').toString());
-            //$('#sl2').attr('officerID', record.get('officer_ids'));
-
+            var lat = record.get('latitude')
+            var lng = record.get('longitude')
+            var marker = new L.Marker(new L.LatLng(lat, lng))
+            marker.bindPopup('<b>Address:</b> ' + record.get('address') + '<br>' + '<b>Officers: </b>' + record.get('officers').toString() 
+            + '<br><b>Offshore Countries: </b> ' + record.get('jurisdictions').toString()
+            + '<br><b>Entities:</b>' + idlinkformat(record.get('entities'), record.get('entity_ids'), 'entity', lat, lng)
+            + '<br><b>Officers:</b>' + idlinkformat(record.get('officers'), record.get('officer_ids'), 'officer', lat, lng)
+            );
+        
             
             markerLayers.addLayer(marker);
             //heatmap.pushData(record.get('latitude'), record.get('longitude'), record.get('strength')*0.01);
@@ -84,49 +93,77 @@
             //var overlayMaps = {'Markers': markerLayers, 'Heatmap': heatmap};
             var overlayMaps = {'Markers': markerLayers};
 
-            var controls = L.control.layers(null, overlayMaps, {collapsed: false, autoZIndex: true});
-
             map = new L.Map('map', {center: new L.LatLng(51.505, -0.09), zoom: 3, layers: [baseLayer]});
             map.locate({setView: true, maxZoom: 7});
             
+
+
+
             map.on('popupopen', function() {
-                $('.drawPaths').click(function() {
+                $('.entityRel').click(function() {
+
+                  e_id = $(this).attr('entityID')
+                  e_coords = [parseFloat($(this).attr('lat')),parseFloat($(this).attr('lng'))];
                   session
-                    .run(`MATCH (a:Address)<-[:REGISTERED_ADDRESS]-(e:Entity)<-[:CONNECTED_TO|OFFICER_OF]-(o:Officer)
-                      WHERE  a.country_codes="MYS" and exists(a.latitude)
-                      RETURN DISTINCT a.address, e.name as entity1, o as officer LIMIT 1`)
+                    .run(`MATCH (a:Address)<-[:REGISTERED_ADDRESS]-(e:Entity {node_id:"{0}"})<-[:CONNECTED_TO|OFFICER_OF]-(o:Officer),
+                      (o)-[:CONNECTED_TO|OFFICER_OF]->(e2:Entity)-[:REGISTERED_ADDRESS]->(a2:Address)
+                      WHERE  exists(a.latitude) and e<>e2 and a<>a2
+                      RETURN DISTINCT a.address as address1, a2.address as address2, e.name as entity1, e2 as entity2, o as officer`.format(e_id))
                     .then(function (result) {
                       for (i = 0; i < result.records.length; i++) {
                           record = result.records[i]
-                          alert('Clicked the Link: ' + record.get('entity1').toString() + 'officer: '+ record.get('officer').toString());
+                          //alert('Clicked the Link: ' + record.get('entity1').toString() + 'officer: '+ record.get('officer').toString() + 'address: '+ record.get('address2').toString()  );
                       }
+                      console.log("RESULTS:")
+                      console.log(result.records)
+                      
                     }) 
+                    console.log(e_id)
+                    console.log(e_coords)
                 });
-                $('.speciallink2').click(function(e) {
-                      o_ids = $(this).attr('officerID').split(',');
-                      o_coords = [parseFloat($(this).attr('lat')),parseFloat($(this).attr('lng'))];
-                      //console.log('Clicked the Link2: ' + o_ids );
-                      
-                      for (i = 0; i < o_ids.length; i++) {
-                        oid = o_ids[i]
-                        console.log('Clicked the Link2: ' + oid );
-                      } 
-                      console.log('latlng:' + o_coords);
-                      
-                      var pth1  = L.polyline([o_coords, [26, 80]]).addTo(map);
-                      pth1.bindTooltip('<b>Address:</b> '  + '<br>' + '<b>Officers: </b>' +  '<br><b>Entities:</b> ' + '<br><b>Connected Entities:</b> ' + '<br><b>Connected Adds:</b> ').openTooltip();
-                      /*
-                      L.polyline([[45.51, -122.68],[26, 80]]).addTo(map)
-                      L.polyline([[45.51, -122.68],[26, 20]]).addTo(map)
-                      L.polyline([[45.51, -122.68],[6, 17]]).addTo(map)
-                      L.polyline([[26, 20], [80, 100]]).addTo(map)
-                      */
+                $('.officerRel').click(function(e) {
+                    o_id = $(this).attr('officerID');
+                    o_coords = [parseFloat($(this).attr('lat')),parseFloat($(this).attr('lng'))];
+                    //console.log('Clicked the Link2: ' + o_ids );
+                    session
+                      .run(`MATCH (a:Address)<-[:REGISTERED_ADDRESS]-(e:Entity )<-[:CONNECTED_TO|OFFICER_OF]-(o:Officer  {node_id:"{0}"} ),
+                      (o)-[:CONNECTED_TO|OFFICER_OF]->(e2:Entity)-[:REGISTERED_ADDRESS]->(a2:Address)
+                      WHERE  exists(a.latitude) and e<>e2 and a<>a2
+                      RETURN DISTINCT a.address as address1, a2.address as address2, e.name as entity1, e2 as entity2, o as officer`.format(o_id))
+                      .then(function (result) {
+                        for (i = 0; i < result.records.length; i++) {
+                            record = result.records[i]
+                            alert('Clicked the Link: ' + record.get('entity1').toString() + 'officer: '+ record.get('officer').toString() + 'address: '+ record.get('address2').toString()  );
+                        }    
+                      }) 
+                  
+                    
+                    
+                    /*
+                    for (i = 0; i < o_ids.length; i++) {
+                      oid = o_ids[i]
+                      console.log('Clicked the Link2: ' + oid );
+                    } 
+                    console.log('latlng:' + o_coords);
+                    
+                    var pth1  = L.polyline([o_coords, [26, 80]]).addTo(map);
+                    pth1.bindTooltip('<b>Address:</b> '  + '<br>' + '<b>Officers: </b>' +  '<br><b>Entities:</b> ' + '<br><b>Connected Entities:</b> ' + '<br><b>Connected Adds:</b> ').openTooltip();
+                    */
+                    /*
+                    L.polyline([[45.51, -122.68],[26, 80]]).addTo(map)
+                    L.polyline([[45.51, -122.68],[26, 20]]).addTo(map)
+                    L.polyline([[45.51, -122.68],[6, 17]]).addTo(map)
+                    L.polyline([[26, 20], [80, 100]]).addTo(map)
+                    */
+                  
                 });
+
+
+
             });
             map.addLayer(markerLayers);
             //map.addLayer(heatmap);
 
-            controls.addTo(map);
             session.close();
           },
           onError: function (error) {
