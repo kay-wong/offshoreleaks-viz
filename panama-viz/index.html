@@ -76,8 +76,7 @@
     
     function init() {
       console.log("init");
-      var driver = neo4j.v1.driver("bolt://165.227.223.190:7687", neo4j.v1.auth.basic("ppviz", "ppviz"));
-      //var driver = neo4j.v1.driver("bolt://localhost:7687", neo4j.v1.auth.basic("neo4j", "MYPASSWORD"));
+      var driver = neo4j.v1.driver("bolt://localhost:7687", neo4j.v1.auth.basic("neo4j", "MYPASSWORD"));
       
       var baseLayer = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png',{minZoom: 2, maxZoom: 18});
       var markerLayers = new L.MarkerClusterGroup();
@@ -93,7 +92,6 @@
               [x IN entities | x.name] as entities, [x IN entities | x.node_id] as entity_ids,  jurisdictions, strength`)
         .subscribe({
           onNext: function (record) {
-            //console.log(record);
             var lat = record.get('latitude')
             var lng = record.get('longitude')
             var marker = new L.Marker(new L.LatLng(lat, lng))
@@ -105,18 +103,12 @@
         
             
             markerLayers.addLayer(marker);
-            //heatmap.pushData(record.get('latitude'), record.get('longitude'), record.get('strength')*0.01);
+            
           },
           onCompleted: function () {
-            
-            //var overlayMaps = {'Markers': markerLayers, 'Heatmap': heatmap};
             var overlayMaps = {'Markers': markerLayers};
-
             map = new L.Map('map', {center: new L.LatLng(51.505, -0.09), zoom: 3, layers: [baseLayer]});
             map.locate({setView: true, maxZoom: 7});
-            
-
-
 
             map.on('popupopen', function() {
                 $('.entityRel').click(function() {
@@ -140,8 +132,6 @@
                                           '<br><b>Entity1: </b>' + record.get('entity1') +
                                           '<br><b>Entity2: </b>' + record.get('entity2'), {sticky:true});
                       }
-                      console.log("RESULTS:")
-                      console.log(result.records)
                       
                     }) 
                     
