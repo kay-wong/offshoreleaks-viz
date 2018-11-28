@@ -2,10 +2,7 @@
 
 A Geospatial-Network Visualisation of the ICIJ Paradise/Panama Papers data
 
-![OffshoreLeaks Viz](assets/icij-network.gif)
-
-#### Visualisation Demo
-[![Viz Demo](assets/demo.gif)](https://www.youtube.com/watch?v=Se4aYOpO8Ikgit)
+[![OffshoreLeaks Viz](assets/icij-network.gif)](https://www.youtube.com/watch?v=Se4aYOpO8Ikgit)
 
 <br/>
 <br/>
