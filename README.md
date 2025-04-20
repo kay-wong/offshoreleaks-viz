@@ -6,7 +6,7 @@ A Geospatial-Network Visualisation of the ICIJ Paradise/Panama Papers data
 
 ![Viz Demo](assets/demo.gif)
 
-(Featured in the [Neo4j blog](https://neo4j.com/blog/twin4j/this-week-in-neo4j-graph-visualization-of-panama-papers-neo4j-spatial-kettle-to-neo4j-cypher-query-log-analyzer/))
+Featured in the [Neo4j blog](https://neo4j.com/blog/twin4j/this-week-in-neo4j-graph-visualization-of-panama-papers-neo4j-spatial-kettle-to-neo4j-cypher-query-log-analyzer/)
 
 
 ## Set-up instructions
